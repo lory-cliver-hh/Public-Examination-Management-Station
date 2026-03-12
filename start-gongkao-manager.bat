@@ -9,7 +9,7 @@ cd /d "%ROOT%"
 
 netstat -ano | findstr /R /C:":%PORT% .*LISTENING" >nul
 if %errorlevel%==0 (
-  start "" "%URL%"
+  call :openBrowser
   exit /b 0
 )
 
@@ -19,19 +19,22 @@ if not exist "node_modules" (
   if errorlevel 1 goto :error
 )
 
-start "gongkao-manager-dev" /min cmd /k "cd /d \"%ROOT%\" && npm run dev:local"
+echo Building latest version...
+call npm run build
+if errorlevel 1 goto :error
 
-for /L %%i in (1,1,30) do (
-  powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing '%URL%' -TimeoutSec 2 ^| Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
-  if not errorlevel 1 goto :open
-  timeout /t 1 /nobreak >nul
-)
+start "gongkao-manager" /min cmd /c "cd /d \"%ROOT%\" && npm run start:local"
 
-:open
-start "" "%URL%"
+timeout /t 6 /nobreak >nul
+call :openBrowser
 exit /b 0
 
 :error
 echo Failed to start gongkao-manager.
 pause
 exit /b 1
+
+:openBrowser
+powershell -NoProfile -Command "Start-Process '%URL%'" >nul 2>nul
+if errorlevel 1 start "" "%URL%"
+exit /b 0
