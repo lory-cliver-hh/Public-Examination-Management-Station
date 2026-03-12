@@ -19,15 +19,15 @@ if not exist "node_modules" (
   if errorlevel 1 goto :error
 )
 
-start "gongkao-manager-dev" /min cmd /k "cd /d \"%ROOT%\" && npm run dev:local"
-
-for /L %%i in (1,1,30) do (
-  powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing '%URL%' -TimeoutSec 2 ^| Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
-  if not errorlevel 1 goto :open
-  timeout /t 1 /nobreak >nul
+if not exist ".next\BUILD_ID" (
+  echo Building project...
+  call npm run build
+  if errorlevel 1 goto :error
 )
 
-:open
+start "gongkao-manager" /min cmd /c "cd /d \"%ROOT%\" && npm run start:local"
+
+timeout /t 4 /nobreak >nul
 start "" "%URL%"
 exit /b 0
 

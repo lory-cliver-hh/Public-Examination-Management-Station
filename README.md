@@ -39,6 +39,17 @@ npm run dev
 
 打开 `http://localhost:3000` 即可查看。
 
+## 一键打开
+
+Windows 下推荐直接双击项目根目录的 `start-gongkao-manager.bat`。
+
+- 自动检查依赖
+- 自动启动本地开发服务
+- 自动打开浏览器到 `http://127.0.0.1:3001/`
+- 后续改代码会自动热更新，不需要每次重新 `build + start`
+
+如果只想用生产模式预览，可使用 `start-gongkao-manager-prod.bat`。
+
 ## 已验证
 
 ```bash

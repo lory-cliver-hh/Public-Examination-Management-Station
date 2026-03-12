@@ -119,16 +119,16 @@ export function SidebarStudyCalendar() {
 
       <p className="calendar-note-title mt-3 text-sm text-muted">{formatMonthLabel(monthCursor)}</p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white/76 px-3 py-1 text-[11px] text-muted">
+      <div className="mt-3 grid grid-cols-3 gap-1.5">
+        <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-white/76 px-2 py-1 text-[10px] text-muted">
           <span className="h-2.5 w-2.5 rounded-full bg-[#315d85] shadow-[0_0_0_2px_rgba(255,255,255,0.85)]" />
           学时
         </span>
-        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white/76 px-3 py-1 text-[11px] text-muted">
+        <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-white/76 px-2 py-1 text-[10px] text-muted">
           <span className="h-2.5 w-2.5 rounded-full bg-[#ce6a35] shadow-[0_0_0_2px_rgba(255,255,255,0.85)]" />
           刷题
         </span>
-        <span className="inline-flex items-center gap-2 rounded-full border border-line bg-white/76 px-3 py-1 text-[11px] text-muted">
+        <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line bg-white/76 px-2 py-1 text-[10px] text-muted">
           <span className="h-2.5 w-2.5 rounded-full bg-[#62804f] shadow-[0_0_0_2px_rgba(255,255,255,0.85)]" />
           打卡
         </span>

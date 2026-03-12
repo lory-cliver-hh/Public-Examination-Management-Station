@@ -76,7 +76,7 @@ function getPracticeSummary(totalQuestions: number | null, correctQuestions: num
 }
 
 export function DashboardHome() {
-  const { catalog, setLessonStatus, importMeta, hydrated: courseHydrated } = useCourses();
+  const { catalog, setLessonStatus, hydrated: courseHydrated } = useCourses();
   const {
     todayPractice,
     saveTodayPractice,
@@ -131,255 +131,228 @@ export function DashboardHome() {
     parsedPracticeCorrect > parsedPracticeTotal
       ? "正确题数会按总题量自动校正。"
       : null;
+  const statLabelClass = "text-[15px] font-semibold tracking-[0.06em] text-muted";
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
       <div className="space-y-4">
         <section className="panel relative overflow-hidden rounded-[34px] p-6 lg:p-8">
           <div className="paper-grid absolute inset-0 opacity-30" />
-          <div className="relative grid gap-5 xl:grid-cols-[minmax(0,1fr)_232px]">
-            <div className="space-y-5">
-              <div className="max-w-3xl space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <p className="eyebrow">Dashboard</p>
-                  <span className="rounded-full border border-line bg-white/72 px-3 py-1 text-xs text-muted">
-                    {formatDateLabel(todayKey)}
-                  </span>
-                </div>
-                <h1 className="display-title text-4xl leading-tight text-ink md:text-[3.2rem]">
-                  今天的学习面先盯住四件事：学时、打卡、刷题、课程推进。
-                </h1>
+          <div className="relative space-y-5">
+            <div className="max-w-3xl space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="eyebrow">Dashboard</p>
+                <span className="rounded-full border border-line bg-white/72 px-3 py-1 text-xs text-muted">
+                  {formatDateLabel(todayKey)}
+                </span>
               </div>
+              <h1 className="display-title text-4xl leading-tight text-ink md:text-[3.2rem]">
+                今天的学习面先盯住四件事：学时、打卡、刷题、课程推进。
+              </h1>
+            </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.24fr)_repeat(2,minmax(0,0.92fr))]">
-                <article className="rounded-[26px] border border-accent/25 bg-[linear-gradient(135deg,rgba(182,95,51,0.15),rgba(255,251,246,0.95))] p-5 md:col-span-2 xl:col-span-1 xl:row-span-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="whitespace-nowrap text-[13px] font-semibold tracking-[0.08em] text-muted">
-                        今日刷题正确率
-                      </p>
-                      <p className="numeric-display display-title mt-4 text-[3.4rem] leading-none text-ink sm:text-[3.8rem]">
-                        {practiceHydrated ? practiceSummary.accuracyLabel : "--"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-[20px] bg-white/72 px-3 py-2 text-right">
-                      <p className="text-[11px] tracking-[0.12em] text-muted">
-                        错题
-                      </p>
-                      <p className="numeric-display mt-2 text-2xl font-semibold text-accent">
-                        {practiceHydrated && practiceSummary.wrongQuestions !== null
-                          ? practiceSummary.wrongQuestions
-                          : "--"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="mt-4 text-sm leading-7 text-muted">{practiceSummary.note}</p>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-2 text-sm text-muted">
-                      <span className="font-semibold text-ink">总题量</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={practiceDraft.totalQuestions}
-                        onChange={(event) =>
-                          setPracticeDraft((current) => ({
-                            ...current,
-                            totalQuestions: event.target.value,
-                          }))
-                        }
-                        placeholder="例如 25"
-                        className="w-full rounded-[18px] border border-line bg-white/76 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
-                      />
-                    </label>
-
-                    <label className="space-y-2 text-sm text-muted">
-                      <span className="font-semibold text-ink">正确题量</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={practiceDraft.correctQuestions}
-                        onChange={(event) =>
-                          setPracticeDraft((current) => ({
-                            ...current,
-                            correctQuestions: event.target.value,
-                          }))
-                        }
-                        placeholder="例如 19"
-                        className="w-full rounded-[18px] border border-line bg-white/76 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <p className="text-xs leading-6 text-muted">
-                      {practiceWarning ?? "适合记录纸质题本、平板练习或整套专项。"}
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.16fr)_minmax(0,1fr)]">
+              <article className="rounded-[26px] border border-accent/25 bg-[linear-gradient(135deg,rgba(182,95,51,0.15),rgba(255,251,246,0.95))] p-5 xl:row-span-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={`whitespace-nowrap ${statLabelClass}`}>
+                      今日刷题正确率
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => saveTodayPractice(practiceDraft)}
-                      className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep"
-                    >
-                      保存刷题数据
-                    </button>
+                    <p className="numeric-display display-title mt-4 text-[3.4rem] leading-none text-ink sm:text-[3.8rem]">
+                      {practiceHydrated ? practiceSummary.accuracyLabel : "--"}
+                    </p>
                   </div>
-                </article>
 
+                  <div className="rounded-[20px] bg-white/72 px-3 py-2 text-right">
+                    <p className="text-[11px] tracking-[0.12em] text-muted">错题</p>
+                    <p className="numeric-display mt-2 text-2xl font-semibold text-accent">
+                      {practiceHydrated && practiceSummary.wrongQuestions !== null
+                        ? practiceSummary.wrongQuestions
+                        : "--"}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-4 text-sm leading-7 text-muted">{practiceSummary.note}</p>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <label className="space-y-2 text-sm text-muted">
+                    <span className="font-semibold text-ink">总题量</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={practiceDraft.totalQuestions}
+                      onChange={(event) =>
+                        setPracticeDraft((current) => ({
+                          ...current,
+                          totalQuestions: event.target.value,
+                        }))
+                      }
+                      placeholder="例如 25"
+                      className="w-full rounded-[18px] border border-line bg-white/76 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
+                    />
+                  </label>
+
+                  <label className="space-y-2 text-sm text-muted">
+                    <span className="font-semibold text-ink">正确题量</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={practiceDraft.correctQuestions}
+                      onChange={(event) =>
+                        setPracticeDraft((current) => ({
+                          ...current,
+                          correctQuestions: event.target.value,
+                        }))
+                      }
+                      placeholder="例如 19"
+                      className="w-full rounded-[18px] border border-line bg-white/76 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p className="text-xs leading-6 text-muted">
+                    {practiceWarning ?? "适合记录纸质题本、平板练习或整套专项。"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => saveTodayPractice(practiceDraft)}
+                    className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep"
+                  >
+                    保存刷题数据
+                  </button>
+                </div>
+              </article>
+
+              <div className="space-y-3">
                 <article className="rounded-[28px] border border-navy/12 bg-[linear-gradient(135deg,rgba(32,52,73,0.08),rgba(255,253,247,0.96))] p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[13px] font-semibold tracking-[0.08em] text-muted">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="min-w-0 xl:max-w-[240px]">
+                      <p className={statLabelClass}>
                         今日学习时长
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-muted">只记录今天的净学习时长。</p>
+                      <p className="mt-2 text-sm leading-6 text-muted">
+                        只记录今天的净学习时长。
+                      </p>
+                      <div className="mt-5 flex items-end gap-2">
+                        <p className="numeric-display display-title text-[3.2rem] leading-none text-ink">
+                          {ready ? (todayHours || "--") : "--"}
+                        </p>
+                        <span className="mb-1 text-lg font-semibold text-muted">h</span>
+                      </div>
                     </div>
-                    <span className="rounded-full border border-line bg-white/80 px-3 py-1 text-[11px] text-muted">
-                      手动记录
-                    </span>
-                  </div>
 
-                  <div className="mt-5 flex items-end gap-2">
-                    <p className="numeric-display display-title text-[3.2rem] leading-none text-ink">
-                      {ready ? (todayHours || "--") : "--"}
-                    </p>
-                    <span className="mb-1 text-lg font-semibold text-muted">h</span>
-                  </div>
-
-                  <div className="mt-5 rounded-[22px] border border-line/70 bg-white/82 p-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="24"
-                        step="0.5"
-                        value={hourDraft}
-                        onChange={(event) => setHourDraft(event.target.value)}
-                        placeholder="输入小时数"
-                        className="w-full rounded-[16px] border border-line bg-background/60 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setTodayHours(hourDraft)}
-                        className="rounded-full bg-navy px-4 py-3 text-sm font-semibold text-white transition hover:opacity-92"
-                      >
-                        保存
-                      </button>
+                    <div className="rounded-[22px] border border-line/70 bg-white/82 p-3 xl:w-[250px]">
+                      <p className="mb-3 text-[11px] tracking-[0.12em] text-muted">手动记录</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="24"
+                          step="0.5"
+                          value={hourDraft}
+                          onChange={(event) => setHourDraft(event.target.value)}
+                          placeholder="输入小时数"
+                          className="w-full rounded-[16px] border border-line bg-background/60 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setTodayHours(hourDraft)}
+                          className="rounded-full bg-navy px-4 py-3 text-sm font-semibold text-white transition hover:opacity-92"
+                        >
+                          保存
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </article>
 
                 <article className="rounded-[28px] border border-sage/20 bg-[linear-gradient(135deg,rgba(89,112,98,0.14),rgba(255,252,246,0.96))] p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-[13px] font-semibold tracking-[0.08em] text-muted">
-                        连续打卡
-                      </p>
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="min-w-0 xl:max-w-[240px]">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className={statLabelClass}>
+                          连续打卡
+                        </p>
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] ${
+                            hasCheckedInToday
+                              ? "border border-sage/30 bg-white/76 text-sage"
+                              : "border border-accent/20 bg-white/76 text-accent"
+                          }`}
+                        >
+                          {hasCheckedInToday ? "今日已打卡" : "待打卡"}
+                        </span>
+                      </div>
                       <p className="mt-2 text-sm leading-6 text-muted">
                         把节奏先守住，再谈拉长单日时长。
                       </p>
+                      <div className="mt-5 flex items-end gap-2">
+                        <p className="numeric-display display-title text-[3.2rem] leading-none text-ink">
+                          {ready ? streak : "--"}
+                        </p>
+                        <span className="mb-1 text-lg font-semibold text-muted">天</span>
+                      </div>
                     </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-[11px] ${
-                        hasCheckedInToday
-                          ? "border border-sage/30 bg-white/76 text-sage"
-                          : "border border-accent/20 bg-white/76 text-accent"
-                      }`}
-                    >
-                      {hasCheckedInToday ? "今日已打卡" : "待打卡"}
-                    </span>
-                  </div>
 
-                  <div className="mt-5 flex items-end gap-2">
-                    <p className="numeric-display display-title text-[3.2rem] leading-none text-ink">
-                      {ready ? streak : "--"}
-                    </p>
-                    <span className="mb-1 text-lg font-semibold text-muted">天</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={toggleTodayCheckIn}
-                    className={`mt-5 w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
-                      hasCheckedInToday
-                        ? "border border-sage/30 bg-sage/10 text-sage hover:border-sage/50"
-                        : "bg-accent text-white hover:bg-accent-deep"
-                    }`}
-                  >
-                    {hasCheckedInToday ? "取消今日打卡" : "完成今日打卡"}
-                  </button>
-                  <p className="mt-3 text-sm leading-6 text-muted">
-                    {ready
-                      ? hasCheckedInToday
-                        ? `最近一次打卡：${latestCheckIn ? formatDateLabel(latestCheckIn) : "今天"}`
-                        : `今天还没打卡${latestCheckIn ? `，最近一次是 ${formatDateLabel(latestCheckIn)}` : ""}`
-                      : "正在读取打卡记录"}
-                  </p>
-                  {checkInDates.length > 0 ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {checkInDates.slice(0, 4).map((date) => (
-                        <span
-                          key={date}
-                          className="rounded-full border border-line px-3 py-1 text-xs text-muted"
-                        >
-                          {formatShortDate(date)}
-                        </span>
-                      ))}
+                    <div className="xl:w-[250px]">
+                      <button
+                        type="button"
+                        onClick={toggleTodayCheckIn}
+                        className={`w-full rounded-full px-4 py-3 text-sm font-semibold transition ${
+                          hasCheckedInToday
+                            ? "border border-sage/30 bg-sage/10 text-sage hover:border-sage/50"
+                            : "bg-accent text-white hover:bg-accent-deep"
+                        }`}
+                      >
+                        {hasCheckedInToday ? "取消今日打卡" : "完成今日打卡"}
+                      </button>
+                      <p className="mt-3 text-sm leading-6 text-muted">
+                        {ready
+                          ? hasCheckedInToday
+                            ? `最近一次打卡：${latestCheckIn ? formatDateLabel(latestCheckIn) : "今天"}`
+                            : `今天还没打卡${latestCheckIn ? `，最近一次是 ${formatDateLabel(latestCheckIn)}` : ""}`
+                          : "正在读取打卡记录"}
+                      </p>
+                      {checkInDates.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {checkInDates.slice(0, 4).map((date) => (
+                            <span
+                              key={date}
+                              className="rounded-full border border-line px-3 py-1 text-xs text-muted"
+                            >
+                              {formatShortDate(date)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </article>
-
-                <article className="rounded-[26px] border border-line bg-white/72 p-5 md:col-span-2 xl:col-span-2">
-                  <p className="text-[13px] font-semibold tracking-[0.08em] text-muted">
-                    课程完成率
-                  </p>
-                  <p className="numeric-display display-title mt-4 text-4xl leading-none text-ink">
-                    {courseSummary.completedLessons} / {courseSummary.totalLessons}
-                  </p>
-                  <div className="mt-4 h-3 overflow-hidden rounded-full bg-background-strong">
-                    <div
-                      className="h-full rounded-full bg-[linear-gradient(90deg,#203449,#b65f33)]"
-                      style={{ width: progressWidth }}
-                    />
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-muted">
-                    已完成 {courseSummary.completionRate}% ，当前 {courseSummary.activeLessons} 节学习中，
-                    {courseSummary.pendingLessons} 节未开始。
-                  </p>
                 </article>
               </div>
+
+              <article className="rounded-[26px] border border-line bg-white/72 p-5 xl:col-span-2">
+                <p className={statLabelClass}>
+                  课程完成率
+                </p>
+                <p className="numeric-display display-title mt-4 text-4xl leading-none text-ink">
+                  {courseSummary.completedLessons} / {courseSummary.totalLessons}
+                </p>
+                <div className="mt-4 h-3 overflow-hidden rounded-full bg-background-strong">
+                  <div
+                    className="h-full rounded-full bg-[linear-gradient(90deg,#203449,#b65f33)]"
+                    style={{ width: progressWidth }}
+                  />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  已完成 {courseSummary.completionRate}% ，当前 {courseSummary.activeLessons} 节学习中，
+                  {courseSummary.pendingLessons} 节未开始。
+                </p>
+              </article>
             </div>
-
-            <aside className="panel-muted self-start rounded-[24px] p-4">
-              <p className="eyebrow">Rhythm Note</p>
-              <h2 className="display-title mt-2 text-[1.35rem] leading-8 text-ink">
-                先把在学课时收口，再开新的模块。
-              </h2>
-
-              <div className="mt-4 space-y-2">
-                <div className="flex items-center justify-between rounded-[18px] bg-white/76 px-3 py-3 text-sm">
-                  <span className="text-muted">课程总量</span>
-                  <span className="numeric-display font-semibold text-ink">
-                    {courseSummary.totalLessons} 节
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-[18px] bg-white/76 px-3 py-3 text-sm">
-                  <span className="text-muted">正在推进</span>
-                  <span className="numeric-display font-semibold text-ink">
-                    {courseSummary.activeLessons} 节
-                  </span>
-                </div>
-              </div>
-
-              <p className="mt-4 text-xs leading-6 text-muted">
-                {importMeta
-                  ? `课程源：${importMeta.fileName}`
-                  : "当前显示的是系统内置课程示例。"}
-              </p>
-            </aside>
           </div>
         </section>
 
