@@ -27,10 +27,21 @@ const FIELD_ALIASES = {
   note: ["备注", "note"],
 } as const;
 
+function normalizeFieldName(value: string) {
+  return value.replace(/^\uFEFF/, "").trim();
+}
+
 function readField(row: RowRecord, aliases: readonly string[]) {
   for (const alias of aliases) {
     if (alias in row) {
       return row[alias];
+    }
+  }
+
+  const normalizedAliases = new Set(aliases.map(normalizeFieldName));
+  for (const [key, value] of Object.entries(row)) {
+    if (normalizedAliases.has(normalizeFieldName(key))) {
+      return value;
     }
   }
 
@@ -57,6 +68,33 @@ function applyDerivedMaterialState(catalog: MaterialCatalog[]) {
       })),
     };
   });
+}
+
+function decodeCsvText(buffer: ArrayBuffer) {
+  const utf8Text = new TextDecoder("utf-8").decode(buffer);
+
+  if (!utf8Text.includes("�")) {
+    return utf8Text;
+  }
+
+  return new TextDecoder("gb18030").decode(buffer);
+}
+
+async function readWorkbookRows(file: File) {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  const isZipWorkbook = bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b;
+  const isCsvFile = file.name.toLowerCase().endsWith(".csv");
+  const workbook = isCsvFile && !isZipWorkbook
+    ? XLSX.read(decodeCsvText(buffer), { type: "string", raw: true })
+    : XLSX.read(buffer, { type: "array" });
+  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  if (!worksheet) {
+    throw new Error("Excel 中没有可读取的工作表。");
+  }
+
+  return XLSX.utils.sheet_to_json<RowRecord>(worksheet, { defval: "" });
 }
 
 export function buildMaterialCatalogFromRows(rows: RowRecord[]) {
@@ -117,15 +155,7 @@ export function buildMaterialCatalogFromRows(rows: RowRecord[]) {
 }
 
 export async function parseMaterialWorkbook(file: File): Promise<ParsedMaterialWorkbook> {
-  const buffer = await file.arrayBuffer();
-  const workbook = XLSX.read(buffer, { type: "array" });
-  const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  if (!worksheet) {
-    throw new Error("Excel 中没有可读取的工作表。");
-  }
-
-  const rows = XLSX.utils.sheet_to_json<RowRecord>(worksheet, { defval: "" });
+  const rows = await readWorkbookRows(file);
   const { catalog, warnings } = buildMaterialCatalogFromRows(rows);
 
   if (catalog.length === 0) {

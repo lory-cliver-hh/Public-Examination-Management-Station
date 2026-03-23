@@ -21,6 +21,17 @@ function parseCsvLine(line: string) {
   return line.split(",");
 }
 
+function decodeTemplateContent(filePath: string) {
+  const buffer = readFileSync(filePath);
+  const utf8Content = new TextDecoder("utf-8").decode(buffer);
+
+  if (!utf8Content.includes("�")) {
+    return utf8Content;
+  }
+
+  return new TextDecoder("gb18030").decode(buffer);
+}
+
 export function loadCourseTemplatePayload(): CourseTemplatePayload {
   const filePath = path.join(process.cwd(), TEMPLATE_FILE);
 
@@ -31,7 +42,7 @@ export function loadCourseTemplatePayload(): CourseTemplatePayload {
     };
   }
 
-  const content = new TextDecoder("gb18030").decode(readFileSync(filePath));
+  const content = decodeTemplateContent(filePath);
   const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())

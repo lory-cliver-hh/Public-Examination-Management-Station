@@ -16,6 +16,7 @@ import { syncCatalogStatus } from "@/lib/course-import";
 import type { CourseImportMeta } from "@/lib/course-template-server";
 
 const STORAGE_KEY = "gongkao-manager:course-catalog";
+const MOJIBAKE_PATTERN = /[\u00C0-\u00FF]/;
 
 type StoredCoursePayload = {
   catalog: CourseCatalog[];
@@ -75,6 +76,28 @@ function normalizeStoredPayload(
   };
 }
 
+function hasMojibake(text: string | undefined) {
+  if (!text) {
+    return false;
+  }
+
+  return MOJIBAKE_PATTERN.test(text) && !/[\u4e00-\u9fff]/.test(text);
+}
+
+function hasCorruptedCatalog(catalog: CourseCatalog[]) {
+  return catalog.some((subject) =>
+    hasMojibake(subject.subject) ||
+    subject.modules.some((module) =>
+      hasMojibake(module.name) ||
+      module.lessons.some((lesson) =>
+        hasMojibake(lesson.title) ||
+        hasMojibake(lesson.chapter) ||
+        hasMojibake(lesson.note),
+      ),
+    ),
+  );
+}
+
 function updateLessonStatusInCatalog(
   currentCatalog: CourseCatalog[],
   lessonId: string,
@@ -118,10 +141,13 @@ export function CourseProvider({
       if (raw) {
         const parsed = normalizeStoredPayload(JSON.parse(raw), fallbackPayload);
 
-        if (parsed.importMeta) {
+        if (parsed.importMeta && !hasCorruptedCatalog(parsed.catalog)) {
           setCatalog(parsed.catalog);
           setImportMeta(parsed.importMeta);
         } else {
+          if (parsed.importMeta && hasCorruptedCatalog(parsed.catalog)) {
+            window.localStorage.removeItem(STORAGE_KEY);
+          }
           setCatalog(initialCatalog);
           setImportMeta(initialImportMeta);
         }

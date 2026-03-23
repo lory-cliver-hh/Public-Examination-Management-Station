@@ -14,6 +14,7 @@ import { materialsCatalog, type MaterialCatalog } from "@/lib/mock-data";
 import type { MaterialImportMeta } from "@/lib/material-template-server";
 
 const STORAGE_KEY = "gongkao-manager:materials-catalog";
+const MOJIBAKE_PATTERN = /[\u00C0-\u00FF]/;
 
 type StoredMaterialsPayload = {
   catalog: MaterialCatalog[];
@@ -54,6 +55,28 @@ function normalizeStoredPayload(
   };
 }
 
+function hasMojibake(text: string | undefined) {
+  if (!text) {
+    return false;
+  }
+
+  return MOJIBAKE_PATTERN.test(text) && !/[\u4e00-\u9fff]/.test(text);
+}
+
+function hasCorruptedCatalog(catalog: MaterialCatalog[]) {
+  return catalog.some((subject) =>
+    hasMojibake(subject.subject) ||
+    subject.modules.some((moduleGroup) =>
+      hasMojibake(moduleGroup.name) ||
+      moduleGroup.items.some((item) =>
+        hasMojibake(item.title) ||
+        hasMojibake(item.chapter) ||
+        hasMojibake(item.note),
+      ),
+    ),
+  );
+}
+
 export function MaterialsProvider({
   children,
   initialCatalog = materialsCatalog,
@@ -80,10 +103,13 @@ export function MaterialsProvider({
       if (raw) {
         const parsed = normalizeStoredPayload(JSON.parse(raw), fallbackPayload);
 
-        if (parsed.importMeta) {
+        if (parsed.importMeta && !hasCorruptedCatalog(parsed.catalog)) {
           setCatalog(parsed.catalog);
           setImportMeta(parsed.importMeta);
         } else {
+          if (parsed.importMeta && hasCorruptedCatalog(parsed.catalog)) {
+            window.localStorage.removeItem(STORAGE_KEY);
+          }
           setCatalog(initialCatalog);
           setImportMeta(initialImportMeta);
         }
