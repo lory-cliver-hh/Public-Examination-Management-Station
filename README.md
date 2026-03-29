@@ -95,8 +95,6 @@ npm run start:local
 
 - `start-gongkao-manager.bat`
   推荐日常使用，每次都会自动构建最新版本后再启动
-- `start-gongkao-manager-prod.bat`
-  用于预览当前已有构建；如果本地还没有构建产物，会先构建一次
 
 ## 别人克隆后是否可以直接运行
 

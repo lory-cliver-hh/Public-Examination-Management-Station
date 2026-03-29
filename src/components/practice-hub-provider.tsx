@@ -15,7 +15,7 @@ const MAX_MOCK_EXAMS = 40;
 
 export type DailyPracticeStats = {
   totalQuestions: number | null;
-  correctQuestions: number | null;
+  wrongQuestions: number | null;
   updatedAt: string | null;
 };
 
@@ -52,7 +52,7 @@ type PracticeHubContextValue = {
   todayPractice: DailyPracticeStats;
   saveTodayPractice: (input: {
     totalQuestions: string;
-    correctQuestions: string;
+    wrongQuestions: string;
   }) => void;
   timerDurationMinutes: number;
   setTimerDurationMinutes: (minutes: string | number) => number;
@@ -64,7 +64,7 @@ type PracticeHubContextValue = {
 
 const EMPTY_PRACTICE: DailyPracticeStats = {
   totalQuestions: null,
-  correctQuestions: null,
+  wrongQuestions: null,
   updatedAt: null,
 };
 
@@ -98,6 +98,41 @@ function parseCount(value: unknown) {
   return Math.round(numeric);
 }
 
+function normalizePracticeCounts(input: {
+  totalQuestions: number | null;
+  wrongQuestions?: number | null;
+  correctQuestions?: number | null;
+}) {
+  if (input.wrongQuestions !== undefined) {
+    const safeTotal = input.totalQuestions ?? input.wrongQuestions ?? null;
+    const safeWrong =
+      input.wrongQuestions === null
+        ? null
+        : safeTotal === null
+          ? input.wrongQuestions
+          : Math.min(input.wrongQuestions, safeTotal);
+
+    return {
+      totalQuestions: safeTotal,
+      wrongQuestions: safeWrong,
+    };
+  }
+
+  const safeTotal = input.totalQuestions ?? input.correctQuestions ?? null;
+  const safeCorrect =
+    input.correctQuestions === null || input.correctQuestions === undefined
+      ? null
+      : safeTotal === null
+        ? input.correctQuestions
+        : Math.min(input.correctQuestions, safeTotal);
+
+  return {
+    totalQuestions: safeTotal,
+    wrongQuestions:
+      safeTotal === null || safeCorrect === null ? null : Math.max(safeTotal - safeCorrect, 0),
+  };
+}
+
 function normalizePracticeStats(raw: unknown): DailyPracticeStats | null {
   if (typeof raw !== "object" || raw === null) {
     return null;
@@ -105,23 +140,21 @@ function normalizePracticeStats(raw: unknown): DailyPracticeStats | null {
 
   const record = raw as Record<string, unknown>;
   const totalQuestions = parseCount(record.totalQuestions);
+  const wrongQuestions = parseCount(record.wrongQuestions);
   const correctQuestions = parseCount(record.correctQuestions);
 
-  if (totalQuestions === null && correctQuestions === null) {
+  if (totalQuestions === null && wrongQuestions === null && correctQuestions === null) {
     return null;
   }
-
-  const safeTotal = totalQuestions ?? correctQuestions ?? null;
-  const safeCorrect =
-    correctQuestions === null
-      ? null
-      : safeTotal === null
-        ? correctQuestions
-        : Math.min(correctQuestions, safeTotal);
+  const normalized = normalizePracticeCounts({
+    totalQuestions,
+    wrongQuestions,
+    correctQuestions,
+  });
 
   return {
-    totalQuestions: safeTotal,
-    correctQuestions: safeCorrect,
+    totalQuestions: normalized.totalQuestions,
+    wrongQuestions: normalized.wrongQuestions,
     updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : null,
   };
 }
@@ -271,26 +304,26 @@ export function PracticeHubProvider({ children }: { children: ReactNode }) {
       dailyPracticeByDate: state.dailyPractice,
       practiceDates: sortDateKeysDescending(Object.keys(state.dailyPractice)),
       todayPractice: state.dailyPractice[todayKey] ?? EMPTY_PRACTICE,
-      saveTodayPractice: ({ totalQuestions, correctQuestions }) => {
+      saveTodayPractice: ({ totalQuestions, wrongQuestions }) => {
         const parsedTotal = parseCount(totalQuestions);
-        const parsedCorrect = parseCount(correctQuestions);
-        const safeTotal = parsedTotal ?? parsedCorrect ?? null;
-        const safeCorrect =
-          parsedCorrect === null
-            ? null
-            : safeTotal === null
-              ? parsedCorrect
-              : Math.min(parsedCorrect, safeTotal);
+        const parsedWrong = parseCount(wrongQuestions);
+        const normalized = normalizePracticeCounts({
+          totalQuestions: parsedTotal,
+          wrongQuestions: parsedWrong,
+        });
 
         setState((current) => {
           const nextDailyPractice = { ...current.dailyPractice };
 
-          if (safeTotal === null && safeCorrect === null) {
+          if (
+            normalized.totalQuestions === null &&
+            normalized.wrongQuestions === null
+          ) {
             delete nextDailyPractice[todayKey];
           } else {
             nextDailyPractice[todayKey] = {
-              totalQuestions: safeTotal,
-              correctQuestions: safeCorrect,
+              totalQuestions: normalized.totalQuestions,
+              wrongQuestions: normalized.wrongQuestions,
               updatedAt: new Date().toISOString(),
             };
           }

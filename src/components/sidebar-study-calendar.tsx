@@ -55,11 +55,12 @@ function createCalendarCells(monthDate: Date): CalendarCell[] {
   });
 }
 
-function formatAccuracy(totalQuestions: number | null, correctQuestions: number | null) {
-  if (!totalQuestions || correctQuestions === null) {
+function formatAccuracy(totalQuestions: number | null, wrongQuestions: number | null) {
+  if (!totalQuestions || wrongQuestions === null) {
     return "--";
   }
 
+  const correctQuestions = Math.max(totalQuestions - Math.min(wrongQuestions, totalQuestions), 0);
   const accuracy = Math.round((correctQuestions / totalQuestions) * 1000) / 10;
   return `${Number.isInteger(accuracy) ? accuracy : accuracy.toFixed(1)}%`;
 }
@@ -214,7 +215,7 @@ export function SidebarStudyCalendar() {
             <p className="numeric-display mt-2 text-lg font-semibold text-ink">
               {formatAccuracy(
                 selectedPractice?.totalQuestions ?? null,
-                selectedPractice?.correctQuestions ?? null,
+                selectedPractice?.wrongQuestions ?? null,
               )}
             </p>
           </div>
@@ -222,9 +223,16 @@ export function SidebarStudyCalendar() {
 
         <p className="mt-3 text-xs leading-6 text-muted">
           {checkInSet.has(selectedDate) ? "这一天已经打卡。" : "这一天还没打卡。"}
-          {selectedPractice?.totalQuestions
-            ? ` 共做 ${selectedPractice.totalQuestions} 题，正确 ${selectedPractice.correctQuestions ?? 0} 题。`
-            : " 暂未录入刷题数据。"}
+          {selectedPractice &&
+          selectedPractice.totalQuestions !== null &&
+          selectedPractice.wrongQuestions !== null
+            ? ` 共做 ${selectedPractice.totalQuestions} 题，错误 ${
+                selectedPractice.wrongQuestions
+              } 题，正确 ${Math.max(
+                selectedPractice.totalQuestions - selectedPractice.wrongQuestions,
+                0,
+              )} 题。`
+            : " 暂未录入完整刷题数据。"}
         </p>
       </div>
     </section>

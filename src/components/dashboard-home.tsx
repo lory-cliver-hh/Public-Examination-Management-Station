@@ -46,32 +46,30 @@ function parseCountDraft(value: string) {
   return Math.round(parsed);
 }
 
-function getPracticeSummary(totalQuestions: number | null, correctQuestions: number | null) {
-  const safeTotal = totalQuestions ?? correctQuestions ?? null;
-  const safeCorrect =
-    correctQuestions === null
+function getPracticeSummary(totalQuestions: number | null, wrongQuestions: number | null) {
+  const safeTotal = totalQuestions ?? wrongQuestions ?? null;
+  const safeWrong =
+    wrongQuestions === null
       ? null
       : safeTotal === null
-        ? correctQuestions
-        : Math.min(correctQuestions, safeTotal);
+        ? wrongQuestions
+        : Math.min(wrongQuestions, safeTotal);
 
-  if (!safeTotal || safeCorrect === null) {
+  if (!safeTotal || safeWrong === null) {
     return {
       accuracyLabel: "--",
-      wrongQuestions: null,
-      note: "录入今日总题量和正确题量后，这里会自动算出正确率。",
+      correctQuestions: null,
+      note: "录入今日总题量和错题量后，这里会自动算出正确率。",
     };
   }
 
+  const safeCorrect = Math.max(safeTotal - safeWrong, 0);
   const accuracy = Math.round((safeCorrect / safeTotal) * 1000) / 10;
 
   return {
     accuracyLabel: `${Number.isInteger(accuracy) ? accuracy : accuracy.toFixed(1)}%`,
-    wrongQuestions: Math.max(safeTotal - safeCorrect, 0),
-    note: `共做 ${safeTotal} 题，正确 ${safeCorrect} 题，错误 ${Math.max(
-      safeTotal - safeCorrect,
-      0,
-    )} 题。`,
+    correctQuestions: safeCorrect,
+    note: `共做 ${safeTotal} 题，错误 ${safeWrong} 题，正确 ${safeCorrect} 题。`,
   };
 }
 
@@ -96,7 +94,7 @@ export function DashboardHome() {
   const [hourDraft, setHourDraft] = useState("");
   const [practiceDraft, setPracticeDraft] = useState({
     totalQuestions: "",
-    correctQuestions: "",
+    wrongQuestions: "",
   });
 
   useEffect(() => {
@@ -107,12 +105,12 @@ export function DashboardHome() {
     setPracticeDraft({
       totalQuestions:
         todayPractice.totalQuestions === null ? "" : String(todayPractice.totalQuestions),
-      correctQuestions:
-        todayPractice.correctQuestions === null
+      wrongQuestions:
+        todayPractice.wrongQuestions === null
           ? ""
-          : String(todayPractice.correctQuestions),
+          : String(todayPractice.wrongQuestions),
     });
-  }, [todayPractice.correctQuestions, todayPractice.totalQuestions]);
+  }, [todayPractice.totalQuestions, todayPractice.wrongQuestions]);
 
   const courseSummary = useMemo(() => getCourseSummary(catalog), [catalog]);
   const focusLessons = useMemo(() => getFocusLessons(catalog), [catalog]);
@@ -120,16 +118,16 @@ export function DashboardHome() {
   const ready = courseHydrated && trackerHydrated;
   const progressWidth = `${Math.max(courseSummary.completionRate, 6)}%`;
   const parsedPracticeTotal = parseCountDraft(practiceDraft.totalQuestions);
-  const parsedPracticeCorrect = parseCountDraft(practiceDraft.correctQuestions);
+  const parsedPracticeWrong = parseCountDraft(practiceDraft.wrongQuestions);
   const practiceSummary = useMemo(
-    () => getPracticeSummary(parsedPracticeTotal, parsedPracticeCorrect),
-    [parsedPracticeCorrect, parsedPracticeTotal],
+    () => getPracticeSummary(parsedPracticeTotal, parsedPracticeWrong),
+    [parsedPracticeTotal, parsedPracticeWrong],
   );
   const practiceWarning =
     parsedPracticeTotal !== null &&
-    parsedPracticeCorrect !== null &&
-    parsedPracticeCorrect > parsedPracticeTotal
-      ? "正确题数会按总题量自动校正。"
+    parsedPracticeWrong !== null &&
+    parsedPracticeWrong > parsedPracticeTotal
+      ? "错题数会按总题量自动校正。"
       : null;
   const statLabelClass = "text-[15px] font-semibold tracking-[0.06em] text-muted";
 
@@ -164,10 +162,10 @@ export function DashboardHome() {
                   </div>
 
                   <div className="rounded-[20px] bg-white/72 px-3 py-2 text-right">
-                    <p className="text-[11px] tracking-[0.12em] text-muted">错题</p>
+                    <p className="text-[11px] tracking-[0.12em] text-muted">正确题</p>
                     <p className="numeric-display mt-2 text-2xl font-semibold text-accent">
-                      {practiceHydrated && practiceSummary.wrongQuestions !== null
-                        ? practiceSummary.wrongQuestions
+                      {practiceHydrated && practiceSummary.correctQuestions !== null
+                        ? practiceSummary.correctQuestions
                         : "--"}
                     </p>
                   </div>
@@ -195,19 +193,19 @@ export function DashboardHome() {
                   </label>
 
                   <label className="space-y-2 text-sm text-muted">
-                    <span className="font-semibold text-ink">正确题量</span>
+                    <span className="font-semibold text-ink">错题量</span>
                     <input
                       type="number"
                       min="0"
                       step="1"
-                      value={practiceDraft.correctQuestions}
+                      value={practiceDraft.wrongQuestions}
                       onChange={(event) =>
                         setPracticeDraft((current) => ({
                           ...current,
-                          correctQuestions: event.target.value,
+                          wrongQuestions: event.target.value,
                         }))
                       }
-                      placeholder="例如 19"
+                      placeholder="例如 6"
                       className="w-full rounded-[18px] border border-line bg-white/76 px-4 py-3 text-sm text-ink outline-none transition focus:border-accent"
                     />
                   </label>
@@ -220,7 +218,7 @@ export function DashboardHome() {
                   <button
                     type="button"
                     onClick={() => saveTodayPractice(practiceDraft)}
-                    className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep"
+                    className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep md:w-auto md:min-w-[9.75rem]"
                   >
                     保存刷题数据
                   </button>
@@ -395,7 +393,7 @@ export function DashboardHome() {
 
                     {item.shareUrl ? (
                       <a
-                        className="inline-flex items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep"
+                        className="inline-flex w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white transition hover:bg-accent-deep sm:w-auto sm:min-w-[9.5rem]"
                         href={item.shareUrl}
                         target="_blank"
                         rel="noreferrer"
@@ -408,7 +406,7 @@ export function DashboardHome() {
                         {item.actionLabel}
                       </a>
                     ) : (
-                      <span className="inline-flex items-center justify-center rounded-full border border-dashed border-line px-5 py-3 text-sm text-muted">
+                      <span className="inline-flex w-full shrink-0 items-center justify-center whitespace-nowrap rounded-full border border-dashed border-line px-6 py-3 text-sm text-muted sm:w-auto sm:min-w-[9.5rem]">
                         待补链接
                       </span>
                     )}

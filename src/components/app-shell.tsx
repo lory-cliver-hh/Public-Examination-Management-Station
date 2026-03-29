@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCountdowns } from "@/components/countdown-provider";
+import { SidebarDailyTodos } from "@/components/sidebar-daily-todos";
 import { SidebarStudyCalendar } from "@/components/sidebar-study-calendar";
 
 const navigation = [
   { href: "/", label: "总览", hint: "今天该学什么" },
   { href: "/courses", label: "课程", hint: "按课时直达夸克" },
   { href: "/materials", label: "资料", hint: "按模块查看资料" },
-  { href: "/records", label: "记录", hint: "学习流水与复盘" },
+  { href: "/records", label: "记录", hint: "学习流水、刷题与错题" },
   { href: "/settings", label: "设置", hint: "调整倒计时目标" },
 ];
 
@@ -37,7 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="relative min-h-screen overflow-hidden px-4 py-4 text-ink lg:px-5">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(182,95,51,0.10),transparent_20%),radial-gradient(circle_at_88%_24%,rgba(32,52,73,0.10),transparent_18%),linear-gradient(135deg,rgba(255,255,255,0.28),transparent_38%)]" />
 
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1520px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1520px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[336px_minmax(0,1fr)]">
         <aside className="panel relative overflow-hidden rounded-[30px] p-5">
           <div className="paper-grid absolute inset-0 opacity-50" />
           <div className="relative space-y-6">
@@ -130,6 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <SidebarStudyCalendar />
+            <SidebarDailyTodos />
           </div>
         </aside>
 

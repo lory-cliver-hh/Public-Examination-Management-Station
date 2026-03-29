@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { AppShell } from "@/components/app-shell";
 import { CountdownProvider } from "@/components/countdown-provider";
 import { CourseProvider } from "@/components/course-provider";
+import { DailyTodoProvider } from "@/components/daily-todo-provider";
 import { LearningRecordsProvider } from "@/components/learning-records-provider";
 import { MaterialsProvider } from "@/components/materials-provider";
+import { MistakeNotebookProvider } from "@/components/mistake-notebook-provider";
 import { PracticeHubProvider } from "@/components/practice-hub-provider";
 import { StudyTrackerProvider } from "@/components/study-tracker-provider";
 import { loadCourseTemplatePayload } from "@/lib/course-template-server";
@@ -27,23 +29,27 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased">
         <CountdownProvider>
-          <StudyTrackerProvider>
-            <PracticeHubProvider>
-              <LearningRecordsProvider>
-                <CourseProvider
-                  initialCatalog={courseTemplatePayload.catalog}
-                  initialImportMeta={courseTemplatePayload.importMeta}
-                >
-                  <MaterialsProvider
-                    initialCatalog={materialTemplatePayload.catalog}
-                    initialImportMeta={materialTemplatePayload.importMeta}
-                  >
-                    <AppShell>{children}</AppShell>
-                  </MaterialsProvider>
-                </CourseProvider>
-              </LearningRecordsProvider>
-            </PracticeHubProvider>
-          </StudyTrackerProvider>
+          <DailyTodoProvider>
+            <StudyTrackerProvider>
+              <PracticeHubProvider>
+                <MistakeNotebookProvider>
+                  <LearningRecordsProvider>
+                    <CourseProvider
+                      initialCatalog={courseTemplatePayload.catalog}
+                      initialImportMeta={courseTemplatePayload.importMeta}
+                    >
+                      <MaterialsProvider
+                        initialCatalog={materialTemplatePayload.catalog}
+                        initialImportMeta={materialTemplatePayload.importMeta}
+                      >
+                        <AppShell>{children}</AppShell>
+                      </MaterialsProvider>
+                    </CourseProvider>
+                  </LearningRecordsProvider>
+                </MistakeNotebookProvider>
+              </PracticeHubProvider>
+            </StudyTrackerProvider>
+          </DailyTodoProvider>
         </CountdownProvider>
       </body>
     </html>

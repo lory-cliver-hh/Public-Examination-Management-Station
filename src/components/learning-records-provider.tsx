@@ -12,6 +12,7 @@ import type { Lesson } from "@/lib/mock-data";
 
 const STORAGE_KEY = "gongkao-manager:learning-records";
 const MAX_RECORDS = 300;
+const RECORD_RETENTION_DAYS = 7;
 
 export type LearningRecord = {
   id: string;
@@ -94,10 +95,25 @@ function normalizeStoredRecords(raw: unknown) {
     return [] as LearningRecord[];
   }
 
-  return raw
+  return purgeOldRecords(
+    raw
     .map((item) => normalizeRecord(item))
     .filter((item): item is LearningRecord => item !== null)
-    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+  );
+}
+
+function getRetentionCutoffDateKey() {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (RECORD_RETENTION_DAYS - 1));
+  return formatDateKey(cutoff);
+}
+
+function purgeOldRecords(records: LearningRecord[]) {
+  const cutoffDateKey = getRetentionCutoffDateKey();
+
+  return records.filter((record) => record.date >= cutoffDateKey);
 }
 
 function createLessonStatusRecord(input: LessonStatusRecordInput): LearningRecord {
@@ -153,7 +169,9 @@ export function LearningRecordsProvider({ children }: { children: ReactNode }) {
       records,
       appendLessonStatusRecord: (input) => {
         const nextRecord = createLessonStatusRecord(input);
-        setRecords((current) => [nextRecord, ...current].slice(0, MAX_RECORDS));
+        setRecords((current) =>
+          purgeOldRecords([nextRecord, ...current]).slice(0, MAX_RECORDS),
+        );
       },
       hydrated,
     }),
