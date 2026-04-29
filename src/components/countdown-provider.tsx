@@ -11,8 +11,16 @@ import {
   type SetStateAction,
 } from "react";
 import { examCountdowns, type ExamCountdown } from "@/lib/mock-data";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:exam-countdowns";
+const LEGACY_STORAGE_KEY = "gongkao-manager:exam-countdowns";
+const LEGACY_MIGRATION_SCOPE = "countdowns";
 
 type CountdownContextValue = {
   countdowns: ExamCountdown[];
@@ -64,30 +72,68 @@ function normalizeCountdowns(raw: unknown): ExamCountdown[] {
   return normalized.length > 0 ? normalized : examCountdowns;
 }
 
+function hasStoredCountdowns(raw: unknown) {
+  return Array.isArray(raw) && raw.length > 0;
+}
+
 export function CountdownProvider({ children }: { children: ReactNode }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const [countdowns, setCountdowns] = useState<ExamCountdown[]>(examCountdowns);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setCountdowns(normalizeCountdowns(JSON.parse(raw)));
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{ countdowns: unknown }>(
+          supabase,
+          "countdowns",
+        );
+        const cloudCountdowns = normalizeCountdowns(data.countdowns);
+        const legacyCountdowns = normalizeCountdowns(
+          readLegacyJson<unknown>(LEGACY_STORAGE_KEY),
+        );
+        const shouldMigrateLegacy =
+          !hasStoredCountdowns(data.countdowns) &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id) &&
+          hasStoredCountdowns(readLegacyJson<unknown>(LEGACY_STORAGE_KEY));
+
+        if (!cancelled) {
+          setCountdowns(shouldMigrateLegacy ? legacyCountdowns : cloudCountdowns);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            countdowns: legacyCountdowns,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } catch {
+        if (!cancelled) {
+          setCountdowns(examCountdowns);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
       }
-    } catch {
-      setCountdowns(examCountdowns);
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(countdowns));
-  }, [countdowns, hydrated]);
+    void updateUserState(supabase, {
+      countdowns,
+    }).catch(() => undefined);
+  }, [countdowns, hydrated, supabase]);
 
   const value = useMemo<CountdownContextValue>(
     () => ({

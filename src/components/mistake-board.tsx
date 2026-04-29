@@ -536,7 +536,7 @@ export function MistakeBoard() {
             </p>
           </div>
           <div className="rounded-[22px] border border-line bg-white/72 px-4 py-3">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">本地占用</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-muted">累计体积</p>
             <p className="numeric-display mt-2 text-2xl font-semibold text-ink">
               {hydrated ? formatBytes(totalStorageBytes) : "--"}
             </p>
@@ -580,7 +580,7 @@ export function MistakeBoard() {
 
       {!supported ? (
         <div className="mt-5 rounded-[24px] border border-dashed border-line bg-white/60 px-5 py-4 text-sm leading-7 text-muted">
-          当前浏览器环境不支持本地错题本存储，暂时无法保存截图。
+          当前环境无法访问云端错题本上传能力，暂时不能保存截图。
         </div>
       ) : (
         <>
@@ -675,7 +675,7 @@ export function MistakeBoard() {
 
               <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <p className="text-xs leading-6 text-muted">
-                  保存时会保留原图并写入浏览器本地 IndexedDB，不走 localStorage。
+                  保存时会保留原图并同步到当前账号的云端错题本。
                 </p>
                 <button
                   type="submit"

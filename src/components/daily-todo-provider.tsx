@@ -8,8 +8,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:daily-todos";
+const LEGACY_STORAGE_KEY = "gongkao-manager:daily-todos";
+const LEGACY_MIGRATION_SCOPE = "daily-todos";
 
 export type DailyTodoItem = {
   id: string;
@@ -138,30 +146,63 @@ function normalizeStoredState(raw: unknown) {
   );
 }
 
+function hasAnyTodos(state: Record<string, DailyTodoItem[]>) {
+  return Object.values(state).some((items) => items.length > 0);
+}
+
 export function DailyTodoProvider({ children }: { children: ReactNode }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const todayKey = getLocalDateKey();
   const [todosByDate, setTodosByDate] = useState<Record<string, DailyTodoItem[]>>({});
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-      if (raw) {
-        setTodosByDate(normalizeStoredState(JSON.parse(raw)));
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{ daily_todos: unknown }>(
+          supabase,
+          "daily_todos",
+        );
+        const cloudTodos = normalizeStoredState(data.daily_todos);
+        const legacyTodos = normalizeStoredState(readLegacyJson<unknown>(LEGACY_STORAGE_KEY));
+        const shouldMigrateLegacy =
+          !hasAnyTodos(cloudTodos) &&
+          hasAnyTodos(legacyTodos) &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id);
+
+        if (!cancelled) {
+          setTodosByDate(shouldMigrateLegacy ? legacyTodos : cloudTodos);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            daily_todos: legacyTodos,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
       }
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(todosByDate));
-  }, [hydrated, todosByDate]);
+    void updateUserState(supabase, {
+      daily_todos: todosByDate,
+    }).catch(() => undefined);
+  }, [hydrated, supabase, todosByDate]);
 
   const value = useMemo<DailyTodoContextValue>(
     () => ({

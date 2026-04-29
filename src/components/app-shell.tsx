@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCountdowns } from "@/components/countdown-provider";
 import { SidebarDailyTodos } from "@/components/sidebar-daily-todos";
 import { SidebarStudyCalendar } from "@/components/sidebar-study-calendar";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 
 const navigation = [
   { href: "/", label: "总览", hint: "今天该学什么" },
@@ -29,21 +31,23 @@ function getNearestCountdown(
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const supabase = createSupabaseClient();
   const pathname = usePathname();
   const { countdowns, hydrated } = useCountdowns();
+  const [signingOut, setSigningOut] = useState(false);
   const nearest = getNearestCountdown(countdowns);
   const daysLeft = nearest ? Math.floor(nearest.diff / (1000 * 60 * 60 * 24)) : 0;
 
   return (
     <div className="relative min-h-screen overflow-hidden px-4 py-4 text-ink lg:px-5">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(182,95,51,0.10),transparent_20%),radial-gradient(circle_at_88%_24%,rgba(32,52,73,0.10),transparent_18%),linear-gradient(135deg,rgba(255,255,255,0.28),transparent_38%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_10%,rgba(182,95,51,0.07),transparent_18%),radial-gradient(circle_at_88%_24%,rgba(32,52,73,0.07),transparent_16%),linear-gradient(180deg,rgba(255,255,255,0.08),transparent_40%)]" />
 
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-[1520px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)] xl:grid-cols-[336px_minmax(0,1fr)]">
         <aside className="panel relative overflow-hidden rounded-[30px] p-5">
           <div className="paper-grid absolute inset-0 opacity-50" />
           <div className="relative space-y-6">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-3 rounded-full border border-line bg-white/70 px-3 py-2">
+              <div className="inline-flex items-center gap-3 rounded-full border border-line bg-[#f4ecdf]/82 px-3 py-2">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-navy text-sm font-semibold tracking-[0.22em] text-white">
                   GK
                 </div>
@@ -51,6 +55,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <p className="text-sm font-semibold text-ink">公考管理系统</p>
                   <p className="text-xs text-muted">学习驾驶舱</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSigningOut(true);
+                    void supabase.auth.signOut().finally(() => {
+                      window.location.href = "/login";
+                    });
+                  }}
+                  className="ml-2 rounded-full border border-line px-3 py-2 text-xs text-muted transition hover:border-accent/40 hover:text-accent disabled:opacity-45"
+                  disabled={signingOut}
+                >
+                  {signingOut ? "退出中..." : "退出"}
+                </button>
               </div>
 
               <div className="space-y-2">
@@ -76,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className={`block rounded-[24px] border px-4 py-3 transition ${
                       active
                         ? "border-navy bg-[linear-gradient(135deg,#203449,#35516b)] text-white shadow-[0_18px_40px_rgba(32,52,73,0.22)]"
-                        : "border-line bg-white/65 text-ink hover:-translate-y-0.5 hover:border-sage/40"
+                        : "border-line bg-[#f3ebde]/78 text-ink hover:-translate-y-0.5 hover:border-sage/40"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -124,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="rounded-[26px] border border-dashed border-line bg-white/45 p-4">
+            <div className="rounded-[26px] border border-dashed border-line bg-[#ece1cf]/72 p-4">
               <p className="eyebrow">Info Feed</p>
               <p className="mt-3 text-sm font-semibold text-ink">公考信息更新</p>
               <p className="mt-2 text-sm leading-7 text-muted">暂无更新</p>

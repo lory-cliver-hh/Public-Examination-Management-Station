@@ -1,0 +1,8 @@
+.git
+.next
+node_modules
+output
+tmp
+.dev-server.err
+.dev-server.log
+npm-debug.log*

@@ -9,8 +9,16 @@ import {
   type ReactNode,
 } from "react";
 import type { Lesson } from "@/lib/mock-data";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:learning-records";
+const LEGACY_STORAGE_KEY = "gongkao-manager:learning-records";
+const LEGACY_MIGRATION_SCOPE = "learning-records";
 const MAX_RECORDS = 300;
 const RECORD_RETENTION_DAYS = 7;
 
@@ -141,28 +149,57 @@ function createLessonStatusRecord(input: LessonStatusRecordInput): LearningRecor
 }
 
 export function LearningRecordsProvider({ children }: { children: ReactNode }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const [records, setRecords] = useState<LearningRecord[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-      if (raw) {
-        setRecords(normalizeStoredRecords(JSON.parse(raw)));
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{ learning_records: unknown }>(
+          supabase,
+          "learning_records",
+        );
+        const cloudRecords = normalizeStoredRecords(data.learning_records);
+        const legacyRecords = normalizeStoredRecords(readLegacyJson<unknown>(LEGACY_STORAGE_KEY));
+        const shouldMigrateLegacy =
+          cloudRecords.length === 0 &&
+          legacyRecords.length > 0 &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id);
+
+        if (!cancelled) {
+          setRecords(shouldMigrateLegacy ? legacyRecords : cloudRecords);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            learning_records: legacyRecords,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
       }
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  }, [hydrated, records]);
+    void updateUserState(supabase, {
+      learning_records: records,
+    }).catch(() => undefined);
+  }, [hydrated, records, supabase]);
 
   const value = useMemo<LearningRecordsContextValue>(
     () => ({

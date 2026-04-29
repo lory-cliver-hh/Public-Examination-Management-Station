@@ -100,7 +100,7 @@ export default function RecordsPage() {
             课程流水、刷题数据和错题截图都会沉淀到这里。
           </h1>
           <p className="mt-4 max-w-3xl text-sm leading-8 text-muted md:text-base">
-            点击“打开夸克继续学习”会记录课程进度，首页保存的刷题数据会按日期归档，错题截图则会保留原图后存到本地错题本。
+            点击“打开夸克继续学习”会记录课程进度，首页保存的刷题数据会按日期归档，错题截图则会保留原图后同步到云端错题本。
           </p>
         </section>
 
@@ -320,7 +320,7 @@ export default function RecordsPage() {
             <p>打开夸克继续学习：自动记录为“学习中”。</p>
             <p>点击标记已完成：自动记录为“已完成”。</p>
             <p>总览页保存刷题数据：按日期沉淀到刷题记录。</p>
-            <p>错题截图：保留原图后保存到浏览器本地 IndexedDB，不走 localStorage。</p>
+            <p>错题截图：保留原图后同步到云端图片存储，换电脑登录也能继续看。</p>
             <p>课程记录：只保留最近 7 天，旧记录会自动清理。</p>
           </div>
         </section>

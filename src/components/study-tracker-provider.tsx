@@ -8,8 +8,16 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:study-tracker";
+const LEGACY_STORAGE_KEY = "gongkao-manager:study-tracker";
+const LEGACY_MIGRATION_SCOPE = "study-tracker";
 
 type StudyTrackerState = {
   dailyHours: Record<string, string>;
@@ -129,7 +137,12 @@ function calculateStreak(checkins: string[]) {
   return streak;
 }
 
+function hasStudyTrackerData(state: StudyTrackerState) {
+  return Object.keys(state.dailyHours).length > 0 || state.checkins.length > 0;
+}
+
 export function StudyTrackerProvider({ children }: { children: ReactNode }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const todayKey = getLocalDateKey();
   const [state, setState] = useState<StudyTrackerState>({
     dailyHours: {},
@@ -138,24 +151,57 @@ export function StudyTrackerProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-      if (raw) {
-        setState(normalizeStoredState(JSON.parse(raw)));
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{
+          daily_hours: unknown;
+          checkins: unknown;
+        }>(supabase, "daily_hours, checkins");
+        const cloudState = normalizeStoredState({
+          dailyHours: data.daily_hours,
+          checkins: data.checkins,
+        });
+        const legacyState = normalizeStoredState(readLegacyJson<unknown>(LEGACY_STORAGE_KEY));
+        const shouldMigrateLegacy =
+          !hasStudyTrackerData(cloudState) &&
+          hasStudyTrackerData(legacyState) &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id);
+
+        if (!cancelled) {
+          setState(shouldMigrateLegacy ? legacyState : cloudState);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            daily_hours: legacyState.dailyHours,
+            checkins: legacyState.checkins,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
       }
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [hydrated, state]);
+    void updateUserState(supabase, {
+      daily_hours: state.dailyHours,
+      checkins: state.checkins,
+    }).catch(() => undefined);
+  }, [hydrated, state, supabase]);
 
   const value = useMemo<StudyTrackerContextValue>(
     () => ({

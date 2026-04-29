@@ -14,8 +14,16 @@ import { useLearningRecords } from "@/components/learning-records-provider";
 import { courseCatalog, type CourseCatalog } from "@/lib/mock-data";
 import { syncCatalogStatus } from "@/lib/course-import";
 import type { CourseImportMeta } from "@/lib/course-template-server";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:course-catalog";
+const LEGACY_STORAGE_KEY = "gongkao-manager:course-catalog";
+const LEGACY_MIGRATION_SCOPE = "course-catalog";
 const MOJIBAKE_PATTERN = /[\u00C0-\u00FF]/;
 
 type StoredCoursePayload = {
@@ -116,6 +124,30 @@ function updateLessonStatusInCatalog(
   );
 }
 
+function hasCoursePayloadData(payload: StoredCoursePayload) {
+  return payload.importMeta !== null || payload.catalog.length > 0;
+}
+
+function hasPersistedCoursePayload(raw: unknown) {
+  if (typeof raw !== "object" || raw === null) {
+    return false;
+  }
+
+  const record = raw as Record<string, unknown>;
+
+  return (
+    (Array.isArray(record.catalog) && record.catalog.length > 0) ||
+    (typeof record.importMeta === "object" && record.importMeta !== null)
+  );
+}
+
+function hasStoredCoursePayload(rawCatalog: unknown, rawImportMeta: unknown) {
+  return (
+    (Array.isArray(rawCatalog) && rawCatalog.length > 0) ||
+    (typeof rawImportMeta === "object" && rawImportMeta !== null)
+  );
+}
+
 export function CourseProvider({
   children,
   initialCatalog = courseCatalog,
@@ -125,6 +157,7 @@ export function CourseProvider({
   initialCatalog?: CourseCatalog[];
   initialImportMeta?: CourseImportMeta | null;
 }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const { appendLessonStatusRecord } = useLearningRecords();
   const [catalog, setCatalog] = useState<CourseCatalog[]>(initialCatalog);
   const [importMeta, setImportMeta] = useState<CourseImportMeta | null>(initialImportMeta);
@@ -136,35 +169,74 @@ export function CourseProvider({
       importMeta: initialImportMeta,
     };
 
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = normalizeStoredPayload(JSON.parse(raw), fallbackPayload);
+    let cancelled = false;
 
-        if (parsed.importMeta && !hasCorruptedCatalog(parsed.catalog)) {
-          setCatalog(parsed.catalog);
-          setImportMeta(parsed.importMeta);
-        } else {
-          if (parsed.importMeta && hasCorruptedCatalog(parsed.catalog)) {
-            window.localStorage.removeItem(STORAGE_KEY);
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{
+          course_catalog: unknown;
+          course_import_meta: unknown;
+        }>(supabase, "course_catalog, course_import_meta");
+
+        const cloudPayload = normalizeStoredPayload(
+          {
+            catalog: data.course_catalog,
+            importMeta: data.course_import_meta,
+          },
+          fallbackPayload,
+        );
+        const rawLegacyPayload = readLegacyJson<unknown>(LEGACY_STORAGE_KEY);
+        const legacyPayload = normalizeStoredPayload(
+          rawLegacyPayload,
+          fallbackPayload,
+        );
+        const shouldMigrateLegacy =
+          !hasStoredCoursePayload(data.course_catalog, data.course_import_meta) &&
+          hasPersistedCoursePayload(rawLegacyPayload) &&
+          hasCoursePayloadData(legacyPayload) &&
+          !hasCorruptedCatalog(legacyPayload.catalog) &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id);
+        const nextPayload = shouldMigrateLegacy ? legacyPayload : cloudPayload;
+
+        if (!cancelled) {
+          if (!hasCorruptedCatalog(nextPayload.catalog)) {
+            setCatalog(nextPayload.catalog);
+            setImportMeta(nextPayload.importMeta);
+          } else {
+            setCatalog(initialCatalog);
+            setImportMeta(initialImportMeta);
           }
-          setCatalog(initialCatalog);
-          setImportMeta(initialImportMeta);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            course_catalog: legacyPayload.catalog,
+            course_import_meta: legacyPayload.importMeta,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
         }
       }
-    } finally {
-      setHydrated(true);
-    }
-  }, [initialCatalog, initialImportMeta]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCatalog, initialImportMeta, supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    const payload: StoredCoursePayload = { catalog, importMeta };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [catalog, hydrated, importMeta]);
+    void updateUserState(supabase, {
+      course_catalog: catalog,
+      course_import_meta: importMeta,
+    }).catch(() => undefined);
+  }, [catalog, hydrated, importMeta, supabase]);
 
   const value = useMemo<CourseContextValue>(
     () => ({

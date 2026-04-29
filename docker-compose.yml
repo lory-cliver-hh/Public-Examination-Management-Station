@@ -1,0 +1,14 @@
+services:
+  gongkao-manager:
+    build:
+      context: .
+    container_name: gongkao-manager
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./output:/app/output
+      - ./course-import-template.csv:/app/course-import-template.csv:ro
+      - ./material-import-template.csv:/app/material-import-template.csv:ro

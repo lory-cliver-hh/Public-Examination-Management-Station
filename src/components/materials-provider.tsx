@@ -12,8 +12,16 @@ import {
 } from "react";
 import { materialsCatalog, type MaterialCatalog } from "@/lib/mock-data";
 import type { MaterialImportMeta } from "@/lib/material-template-server";
+import {
+  hasLegacyMigrationMarker,
+  markLegacyMigration,
+  readLegacyJson,
+} from "@/lib/legacy-storage";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import { selectUserState, updateUserState } from "@/lib/supabase/user-state";
 
-const STORAGE_KEY = "gongkao-manager:materials-catalog";
+const LEGACY_STORAGE_KEY = "gongkao-manager:materials-catalog";
+const LEGACY_MIGRATION_SCOPE = "materials-catalog";
 const MOJIBAKE_PATTERN = /[\u00C0-\u00FF]/;
 
 type StoredMaterialsPayload = {
@@ -77,6 +85,30 @@ function hasCorruptedCatalog(catalog: MaterialCatalog[]) {
   );
 }
 
+function hasMaterialsPayloadData(payload: StoredMaterialsPayload) {
+  return payload.importMeta !== null || payload.catalog.length > 0;
+}
+
+function hasPersistedMaterialsPayload(raw: unknown) {
+  if (typeof raw !== "object" || raw === null) {
+    return false;
+  }
+
+  const record = raw as Record<string, unknown>;
+
+  return (
+    (Array.isArray(record.catalog) && record.catalog.length > 0) ||
+    (typeof record.importMeta === "object" && record.importMeta !== null)
+  );
+}
+
+function hasStoredMaterialsPayload(rawCatalog: unknown, rawImportMeta: unknown) {
+  return (
+    (Array.isArray(rawCatalog) && rawCatalog.length > 0) ||
+    (typeof rawImportMeta === "object" && rawImportMeta !== null)
+  );
+}
+
 export function MaterialsProvider({
   children,
   initialCatalog = materialsCatalog,
@@ -86,6 +118,7 @@ export function MaterialsProvider({
   initialCatalog?: MaterialCatalog[];
   initialImportMeta?: MaterialImportMeta | null;
 }) {
+  const supabase = useMemo(() => createSupabaseClient(), []);
   const [catalog, setCatalog] = useState<MaterialCatalog[]>(initialCatalog);
   const [importMeta, setImportMeta] = useState<MaterialImportMeta | null>(
     initialImportMeta,
@@ -98,35 +131,74 @@ export function MaterialsProvider({
       importMeta: initialImportMeta,
     };
 
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = normalizeStoredPayload(JSON.parse(raw), fallbackPayload);
+    let cancelled = false;
 
-        if (parsed.importMeta && !hasCorruptedCatalog(parsed.catalog)) {
-          setCatalog(parsed.catalog);
-          setImportMeta(parsed.importMeta);
-        } else {
-          if (parsed.importMeta && hasCorruptedCatalog(parsed.catalog)) {
-            window.localStorage.removeItem(STORAGE_KEY);
+    void (async () => {
+      try {
+        const { user, data } = await selectUserState<{
+          materials_catalog: unknown;
+          materials_import_meta: unknown;
+        }>(supabase, "materials_catalog, materials_import_meta");
+
+        const cloudPayload = normalizeStoredPayload(
+          {
+            catalog: data.materials_catalog,
+            importMeta: data.materials_import_meta,
+          },
+          fallbackPayload,
+        );
+        const rawLegacyPayload = readLegacyJson<unknown>(LEGACY_STORAGE_KEY);
+        const legacyPayload = normalizeStoredPayload(
+          rawLegacyPayload,
+          fallbackPayload,
+        );
+        const shouldMigrateLegacy =
+          !hasStoredMaterialsPayload(data.materials_catalog, data.materials_import_meta) &&
+          hasPersistedMaterialsPayload(rawLegacyPayload) &&
+          hasMaterialsPayloadData(legacyPayload) &&
+          !hasCorruptedCatalog(legacyPayload.catalog) &&
+          !hasLegacyMigrationMarker(LEGACY_MIGRATION_SCOPE, user.id);
+        const nextPayload = shouldMigrateLegacy ? legacyPayload : cloudPayload;
+
+        if (!cancelled) {
+          if (!hasCorruptedCatalog(nextPayload.catalog)) {
+            setCatalog(nextPayload.catalog);
+            setImportMeta(nextPayload.importMeta);
+          } else {
+            setCatalog(initialCatalog);
+            setImportMeta(initialImportMeta);
           }
-          setCatalog(initialCatalog);
-          setImportMeta(initialImportMeta);
+        }
+
+        if (shouldMigrateLegacy) {
+          await updateUserState(supabase, {
+            materials_catalog: legacyPayload.catalog,
+            materials_import_meta: legacyPayload.importMeta,
+          });
+          markLegacyMigration(LEGACY_MIGRATION_SCOPE, user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
         }
       }
-    } finally {
-      setHydrated(true);
-    }
-  }, [initialCatalog, initialImportMeta]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialCatalog, initialImportMeta, supabase]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    const payload: StoredMaterialsPayload = { catalog, importMeta };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [catalog, hydrated, importMeta]);
+    void updateUserState(supabase, {
+      materials_catalog: catalog,
+      materials_import_meta: importMeta,
+    }).catch(() => undefined);
+  }, [catalog, hydrated, importMeta, supabase]);
 
   const value = useMemo<MaterialsContextValue>(
     () => ({

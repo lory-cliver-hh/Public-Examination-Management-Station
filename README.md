@@ -11,6 +11,9 @@
 
 ## 当前已实现
 
+- `账号登录与跨设备共享`
+  支持同一账号在两台电脑登录，并共享课程状态、打卡、学习记录、刷题记录、模考成绩、待办和错题本
+
 - `首页仪表盘`
   显示今日学习重点、科目推进、考试倒计时、公考信息预留位
 
@@ -29,6 +32,7 @@
 - React 19
 - TypeScript
 - Tailwind CSS 4
+- Supabase Auth / Database / Storage
 
 ## 使用要求
 
@@ -36,6 +40,10 @@
   推荐 `Windows 10 / 11`
 - 运行环境：
   需要先安装 `Node.js`
+- 共享数据：
+  需要准备一个 `Supabase` 项目，并执行一次初始化 SQL
+- PDF 导出：
+  如果要使用错题本 PDF 导出功能，还需要安装 `Python 3`，并执行 `pip install -r requirements.txt`
 - 包管理器：
   需要可用的 `npm`
 - 网络：
@@ -52,6 +60,22 @@ git clone git@github.com:lory-cliver-hh/Public-Examination-Management-Station.gi
 cd Public-Examination-Management-Station
 ```
 
+然后先完成一次 Supabase 初始化：
+
+1. 复制 `.env.example` 为 `.env.local`
+2. 填写 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+3. 在 Supabase SQL Editor 中执行 [supabase/init.sql](supabase/init.sql)
+4. 在 Supabase `Authentication` → `URL Configuration` 中加入：
+   `Site URL = http://127.0.0.1:3001`
+   `Redirect URLs = http://127.0.0.1:3001/**`
+5. 在 Supabase `Authentication` → `Email Templates` → `Confirm signup` 中，把确认链接改成：
+
+```html
+<a href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email">确认邮箱</a>
+```
+
+6. 参考 [docs/Supabase初始化与共享数据.md](docs/Supabase初始化与共享数据.md)
+
 ### Windows 一键启动
 
 Windows 下推荐直接双击项目根目录的 `start-gongkao-manager.bat`。
@@ -65,6 +89,14 @@ Windows 下推荐直接双击项目根目录的 `start-gongkao-manager.bat`。
 - 自动打开浏览器到 `http://127.0.0.1:3001/`
 
 也就是说，你以后改完代码后，不需要再手动执行 `npm run build` 和 `npm run start`，直接再次双击这个脚本即可。
+
+如果你希望同一局域网内的另一台电脑也能访问，请双击：
+
+```text
+start-gongkao-manager-lan.bat
+```
+
+这个脚本会让服务监听 `0.0.0.0`，并在终端里打印可访问的局域网地址。
 
 ### 手动启动
 
@@ -83,6 +115,21 @@ npm run dev:local
 http://127.0.0.1:3001/
 ```
 
+局域网调试模式：
+
+```bash
+npm install
+npm run dev:network
+```
+
+生产模式局域网访问：
+
+```bash
+npm install
+npm run build
+npm run start:network
+```
+
 生产模式预览：
 
 ```bash
@@ -95,6 +142,22 @@ npm run start:local
 
 - `start-gongkao-manager.bat`
   推荐日常使用，每次都会自动构建最新版本后再启动
+- `start-gongkao-manager-lan.bat`
+  局域网共享访问，适合同一网络内其他电脑打开
+
+## 登录与共享
+
+当前版本已经支持：
+
+- 两台电脑登录同一个账号
+- 共享课程状态、待办、打卡、学习记录、刷题记录、模考成绩、倒计时
+- 共享错题本截图和错题记录
+
+使用方式很简单：
+
+1. 第一台电脑先注册一个邮箱账号
+2. 第二台电脑用同一个邮箱账号登录
+3. 两台电脑刷新后看到同一份数据
 
 ## 别人克隆后是否可以直接运行
 
@@ -161,14 +224,32 @@ http://127.0.0.1:3001/
 
 ## 当前约束
 
-- 课程与记录仍使用示例数据，尚未接数据库
 - 夸克链接目前是占位入口，后续替换为真实分享链接
 - 公考信息更新区仅预留版位，暂未接爬虫或资讯聚合
-- 倒计时设置目前保存在浏览器本地存储中
+- 当前重点是“跨设备共享”，还没有接入 `Supabase Realtime` 做无刷新实时协同
+- 如果两台电脑同时打开页面，一台修改后，另一台通常需要刷新页面才能读到最新内容
+
+## 部署与异机访问
+
+已经补充：
+
+- `Dockerfile`
+- `docker-compose.yml`
+- [docs/部署与异机访问.md](docs/部署与异机访问.md)
+- [docs/Supabase初始化与共享数据.md](docs/Supabase初始化与共享数据.md)
+
+如果你的目标是：
+
+- `同一局域网另一台电脑打开`
+  优先使用 `start-gongkao-manager-lan.bat`
+- `把项目放到云服务器并发布成网站`
+  优先使用 `docker compose up -d --build`
+- `多台电脑共享同一份学习数据`
+  当前版本已经支持，但前提是先完成 Supabase 初始化
 
 ## 下一步建议
 
-1. 接入 SQLite / Prisma，替换掉当前示例数据
-2. 实现课程、记录、倒计时的真实增删改查
-3. 接入夸克真实分享链接
-4. 增加统计页、复盘页和后续资讯模块
+1. 接入 `Supabase Realtime`，让两台电脑无需刷新也能即时同步
+2. 接入夸克真实分享链接
+3. 增加统计页、复盘页和后续资讯模块
+4. 增加更细的账号管理和备份能力

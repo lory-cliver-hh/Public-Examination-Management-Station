@@ -120,7 +120,7 @@ export default function SettingsPage() {
               管理考试节点和课程导入。
             </h1>
             <p className="max-w-3xl text-sm leading-8 text-muted md:text-base">
-              修改后会自动保存到当前浏览器，并同步到首页和侧栏。
+              修改后会自动同步到当前账号，并在其他已登录设备上共享。
             </p>
           </div>
 
