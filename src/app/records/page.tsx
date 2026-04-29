@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useLearningRecords } from "@/components/learning-records-provider";
 import { MistakeBoard } from "@/components/mistake-board";
 import { usePracticeHub } from "@/components/practice-hub-provider";
@@ -10,6 +10,7 @@ const statusStyle = {
   学习中: "border-accent/30 bg-accent/10 text-accent-deep",
   已完成: "border-sage/30 bg-sage/10 text-sage",
 } as const;
+const DEFAULT_VISIBLE_PRACTICE_DAYS = 7;
 
 function formatPracticeAccuracy(totalQuestions: number | null, wrongQuestions: number | null) {
   if (!totalQuestions || wrongQuestions === null) {
@@ -49,6 +50,7 @@ function formatUpdatedAt(value: string | null) {
 }
 
 export default function RecordsPage() {
+  const [showAllPracticeRecords, setShowAllPracticeRecords] = useState(false);
   const { records, hydrated } = useLearningRecords();
   const {
     dailyPracticeByDate,
@@ -77,6 +79,17 @@ export default function RecordsPage() {
         .filter((item) => item.totalQuestions !== null || item.wrongQuestions !== null),
     [dailyPracticeByDate, practiceDates],
   );
+  const visiblePracticeRecords = useMemo(
+    () =>
+      showAllPracticeRecords
+        ? practiceRecords
+        : practiceRecords.slice(0, DEFAULT_VISIBLE_PRACTICE_DAYS),
+    [practiceRecords, showAllPracticeRecords],
+  );
+  const hiddenPracticeRecordCount = Math.max(
+    practiceRecords.length - DEFAULT_VISIBLE_PRACTICE_DAYS,
+    0,
+  );
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -97,7 +110,20 @@ export default function RecordsPage() {
               <p className="eyebrow">Practice Records</p>
               <h2 className="display-title mt-2 text-3xl text-ink">刷题记录</h2>
             </div>
-            <p className="text-sm text-muted">总览页保存后会自动按日期沉淀到这里。</p>
+            <div className="flex flex-col items-start gap-2 text-sm text-muted md:items-end">
+              <p>默认展示最近 7 天，历史刷题记录仍会保留。</p>
+              {practiceRecords.length > DEFAULT_VISIBLE_PRACTICE_DAYS ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllPracticeRecords((current) => !current)}
+                  className="rounded-full border border-line px-4 py-2 text-sm font-medium text-ink transition hover:border-accent/40 hover:text-accent-deep"
+                >
+                  {showAllPracticeRecords
+                    ? "收起历史记录"
+                    : `查看全部 ${practiceRecords.length} 天记录`}
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {!practiceHydrated ? (
@@ -109,75 +135,83 @@ export default function RecordsPage() {
               还没有刷题记录。去总览页录入总题量和错题量后，这里会自动出现按日期整理的记录。
             </div>
           ) : (
-            <div className="mt-5 grid gap-3">
-              {practiceRecords.map((item, index) => {
-                const safeTotal = item.totalQuestions ?? item.wrongQuestions ?? 0;
-                const wrongQuestions =
-                  item.wrongQuestions === null
+            <div className="mt-5 space-y-4">
+              {hiddenPracticeRecordCount > 0 && !showAllPracticeRecords ? (
+                <div className="rounded-[24px] border border-dashed border-line bg-white/60 px-5 py-4 text-sm leading-7 text-muted">
+                  已折叠更早的 {hiddenPracticeRecordCount} 天刷题记录，需要时可展开查看全部。
+                </div>
+              ) : null}
+
+              <div className="grid gap-3">
+                {visiblePracticeRecords.map((item, index) => {
+                  const safeTotal = item.totalQuestions ?? item.wrongQuestions ?? 0;
+                  const wrongQuestions =
+                    item.wrongQuestions === null
                     ? null
                     : Math.min(item.wrongQuestions, safeTotal);
                 const correctQuestions =
                   wrongQuestions === null ? null : Math.max(safeTotal - wrongQuestions, 0);
 
-                return (
-                  <article
-                    key={item.date}
-                    className={`rounded-[26px] border p-5 ${
-                      index === 0
-                        ? "border-accent/30 bg-[linear-gradient(135deg,rgba(182,95,51,0.12),rgba(255,251,245,0.92))]"
-                        : "border-line bg-white/72"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <p className="eyebrow">Practice Day</p>
-                        <h3 className="display-title mt-2 text-2xl text-ink">
-                          {formatDateLabel(item.date)}
-                        </h3>
-                        <p className="mt-2 text-sm leading-7 text-muted">
-                          最近更新：{formatUpdatedAt(item.updatedAt)}
-                        </p>
+                  return (
+                    <article
+                      key={item.date}
+                      className={`rounded-[26px] border p-5 ${
+                        index === 0
+                          ? "border-accent/30 bg-[linear-gradient(135deg,rgba(182,95,51,0.12),rgba(255,251,245,0.92))]"
+                          : "border-line bg-white/72"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <p className="eyebrow">Practice Day</p>
+                          <h3 className="display-title mt-2 text-2xl text-ink">
+                            {formatDateLabel(item.date)}
+                          </h3>
+                          <p className="mt-2 text-sm leading-7 text-muted">
+                            最近更新：{formatUpdatedAt(item.updatedAt)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-[22px] border border-line bg-background/72 px-4 py-3 text-right">
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                            正确率
+                          </p>
+                          <p className="numeric-display mt-2 text-3xl font-semibold text-ink">
+                            {formatPracticeAccuracy(item.totalQuestions, item.wrongQuestions)}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="rounded-[22px] border border-line bg-background/72 px-4 py-3 text-right">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
-                          正确率
-                        </p>
-                        <p className="numeric-display mt-2 text-3xl font-semibold text-ink">
-                          {formatPracticeAccuracy(item.totalQuestions, item.wrongQuestions)}
-                        </p>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-[18px] bg-background/72 px-4 py-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                            总题量
+                          </p>
+                          <p className="numeric-display mt-2 text-xl font-semibold text-ink">
+                            {item.totalQuestions ?? "--"}
+                          </p>
+                        </div>
+                        <div className="rounded-[18px] bg-background/72 px-4 py-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                            正确题量
+                          </p>
+                          <p className="numeric-display mt-2 text-xl font-semibold text-ink">
+                            {correctQuestions ?? "--"}
+                          </p>
+                        </div>
+                        <div className="rounded-[18px] bg-background/72 px-4 py-3">
+                          <p className="text-xs uppercase tracking-[0.18em] text-muted">
+                            错题数
+                          </p>
+                          <p className="numeric-display mt-2 text-xl font-semibold text-ink">
+                            {wrongQuestions ?? "--"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-[18px] bg-background/72 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
-                          总题量
-                        </p>
-                        <p className="numeric-display mt-2 text-xl font-semibold text-ink">
-                          {item.totalQuestions ?? "--"}
-                        </p>
-                      </div>
-                      <div className="rounded-[18px] bg-background/72 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
-                          正确题量
-                        </p>
-                        <p className="numeric-display mt-2 text-xl font-semibold text-ink">
-                          {correctQuestions ?? "--"}
-                        </p>
-                      </div>
-                      <div className="rounded-[18px] bg-background/72 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.18em] text-muted">
-                          错题数
-                        </p>
-                        <p className="numeric-display mt-2 text-xl font-semibold text-ink">
-                          {wrongQuestions ?? "--"}
-                        </p>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                })}
+              </div>
             </div>
           )}
         </section>
